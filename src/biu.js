@@ -9,6 +9,7 @@ class Biu {
         this.container.style.overflow = 'hidden';
         this.container.style.height = '100%';
         this.container.style.width = '100%';
+        this.container.style.pointerEvents = 'none';
         this.el.appendChild(this.container);
         this.config = {
             fontSize: '25px',
