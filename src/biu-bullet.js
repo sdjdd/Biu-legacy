@@ -20,10 +20,10 @@ class BiuBullet {
         if (this.state != 0) return;
         this.state = 1;
         if (this.cfgObj.type === 0) {
-            this.setTransition('transform', this.speed + 'ms', 'linear', this.cfgObj.offset + 'ms');
+            this.setTransition('transform', this.speed + 'ms', 'linear', this.offset + 'ms');
         } else if (this.cfgObj.type === 2) {
             //this.setTransition('transform', '0s', 'linear', this.cfgObj.offset + 'ms');
-            this.dom.style.transition = 'transform 0s linear ' + this.cfgObj.offset + 'ms, opacity 0s linear ' + (this.speed + this.cfgObj.offset) + 'ms';
+            this.dom.style.transition = 'transform 0s linear ' + this.offset + 'ms, opacity 0s linear ' + (this.speed + this.offset) + 'ms';
             this.dom.style.opacity = '0';
         }
         this.dom.style.transform = 'translateX(-' + this.distination + 'px)';

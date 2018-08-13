@@ -4,7 +4,7 @@ module.exports = {
     output: {
         path: __dirname + '/dist',
         filename: 'biu.min.js',
-        publicPath: '../dist'
+        publicPath: '/dist'
     },
     module: {
         rules: [
