@@ -9,6 +9,7 @@ class BiuBullet {
         this.distination = 0;
         this.passed = 0;
         this.offset = 0;
+        this.style = null;
 
         let bullet = this;
         Object.keys(obj).forEach(function(v){
@@ -21,10 +22,10 @@ class BiuBullet {
         this.state = 1;
         if (this.cfgObj.type === 0) {
             this.setTransition('transform', this.speed + 'ms', 'linear', this.offset + 'ms');
-        } else if (this.cfgObj.type === 2) {
+        } else if (this.cfgObj.type === 1 || this.cfgObj.type === 2) {
             //this.setTransition('transform', '0s', 'linear', this.cfgObj.offset + 'ms');
             this.dom.style.transition = 'transform 0s linear ' + this.offset + 'ms, opacity 0s linear ' + (this.speed + this.offset) + 'ms';
-            this.dom.style.opacity = '0';
+            this.dom.style.opacity = 0;
         }
         this.dom.style.transform = 'translateX(-' + this.distination + 'px)';
     }
@@ -48,12 +49,12 @@ class BiuBullet {
             this.passed += passed;
             this.setTransition('transform', '0s', 'linear', '0s');
             this.dom.style.transform = 'translateX(-' + this.passed + 'px)';
-        } else if (this.cfgObj.type === 2) {
+        } else if (this.cfgObj.type === 1 || this.cfgObj.type === 2) {
             if (passedTime < 0) {
                 this.dom.style.transform = '';
             }
             this.dom.style.transition = '';
-            this.dom.style.opacity = '1';
+            this.dom.style.opacity = this.style.opacity;
         }
     }
 
@@ -63,9 +64,9 @@ class BiuBullet {
         this.startTime = Date.now() + this.offset;
         if (this.cfgObj.type === 0) {
             this.setTransition('transform', this.speed + 'ms', 'linear', this.offset + 'ms');
-        } else if (this.cfgObj.type === 2) {
+        } else if (this.cfgObj.type === 1 || this.cfgObj.type === 2) {
             this.dom.style.transition = 'transform 0s linear ' + this.offset + 'ms, opacity 0s linear ' + (this.speed + this.offset) + 'ms';
-            this.dom.style.opacity = '0';
+            this.dom.style.opacity = 0;
         }
         this.dom.style.transform = 'translateX(-' + this.distination + 'px)';
     }

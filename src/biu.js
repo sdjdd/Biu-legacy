@@ -40,7 +40,7 @@ class Biu {
             value: 0,
             pause: 0,
             start: 0,
-            currentSecond: 0
+            currentSecond: 0,
         };  //play progress
 
         thisAttr.timer = null;
@@ -50,7 +50,8 @@ class Biu {
             top: new Map,
             bottom: new Map,
             rollTop: 0,
-            topTop: 0
+            topTop: 0,
+            bottomTop: -1,
         }
         thisAttr.state = 0;    //0=stop, 1=play, 2=pause
 
@@ -158,7 +159,13 @@ class Biu {
         loadDanmaku.call(this, danmaku);
     }
 
-    render(danmakus, delay) {
+    render(danmakus, delay, immediately) {
+        if (!delay) {
+            delay = 0;
+        }
+        if (immediately === undefined) {
+            immediately = false;
+        }
         for (let i = 0; i < danmakus.length; ++i) {
             let node = danmakus[i];
             let dom = createBiuDom.call(this);
@@ -169,27 +176,41 @@ class Biu {
                     dom.style[v] = node.style[v];
                 });
             }
+            let obj = {
+                dom: dom,
+                node: node,
+                delay: delay,
+                immediately: immediately,
+            };
             switch (node.type) {
-                case 2:
-                    renderTopBullet.call(this, dom, node, delay);
-                    break;
                 case 1:
+                    renderTopBullet.call(this, obj);
+                    break;
+                case 2:
+                    renderBottomBullet.call(this, obj);
                     break;
                 default:
-                    renderRollBullet.call(this, dom, node, delay);
+                    renderRollBullet.call(this, obj);
             }      
         }
     }
 
     shot(obj, load) {
         let thisAttr = attr.call(this);
-        obj.time = this.progress.value;
+        if (thisAttr.state === 1) {
+            obj.time = Date.now() - thisAttr.progress.start + thisAttr.progress.value;
+        } else if (thisAttr.state === 2) {
+            obj.time = thisAttr.progress.value;
+        } else {
+            return;
+        }
         let danmaku = createDanmakuNode(obj);
+        console.log(danmaku)
         if (danmaku === null) {
             return;
         }
         if (thisAttr.state === 1) {
-            this.render([danmaku]);
+            this.render([danmaku], 0, true);
         } else {
             thisAttr.prepareList.push(danmaku);
         }
@@ -237,6 +258,7 @@ class Biu {
         track.bottom.clear();
         track.topTop = 0;
         track.rollTop = 0;
+        track.bottomTop = -1;
     }
 }
 
@@ -328,11 +350,15 @@ function renderThisSecond() {
     this.render(t, -offset);
 }
 
-function renderRollBullet(dom, node, delay) {
+function renderRollBullet(obj) {
+    let dom = obj.dom,
+        node = obj.node,
+        delay = obj.delay,
+        immediately = obj.immediately;
     let thisAttr = attr.call(this);
     let container = thisAttr.container;
     let config = this.config;
-    let totalOffset = delay + node.offset;
+    let totalOffset = immediately ? 0 : delay + node.offset;
     let now = Date.now();
     dom.style.left = container.clientWidth + 1 + 'px'; //1 is shadow width
     dom.style.willChange = "transform";
@@ -341,7 +367,8 @@ function renderRollBullet(dom, node, delay) {
         cfgObj: node,
         dom: dom,
         speed: config.speed,
-        offset: totalOffset
+        offset: totalOffset,
+        style: this.style,
     });
     bullet.distination = container.clientWidth + dom.offsetWidth + 2 * 1;//1 is shadow width
     let pxSpeed = bullet.distination / bullet.speed;
@@ -359,7 +386,7 @@ function renderRollBullet(dom, node, delay) {
         top += dom.offsetHeight;
     }
     if (!perfect) {
-        if (track.rollTop >= container.clientHeight - dom.offsetHeight) {
+        if (track.rollTop > container.clientHeight - dom.offsetHeight) {
             track.rollTop = 0;
         }
         top = track.rollTop;
@@ -376,11 +403,15 @@ function renderRollBullet(dom, node, delay) {
     bullet.shot();
 }
 
-function renderTopBullet(dom, node, delay) {
+function renderTopBullet(obj) {
+    let dom = obj.dom,
+        node = obj.node,
+        delay = obj.delay,
+        immediately = obj.immediately;
     let thisAttr = attr.call(this);
     let config = this.config;
     let container = thisAttr.container;
-    let totalOffset = delay + node.offset;
+    let totalOffset = immediately ? 0 : delay + node.offset;
     let now = Date.now();
     dom.style.left = container.clientWidth + 1 + 'px'; //1 is shadow width
     //dom.style.willChange = "opacity";
@@ -389,7 +420,8 @@ function renderTopBullet(dom, node, delay) {
         cfgObj: node,
         dom: dom,
         speed: config.speed,
-        offset: totalOffset
+        offset: totalOffset,
+        style: this.style,
     });
     bullet.distination = (container.clientWidth + dom.offsetWidth) / 2 + 1;//1 is shadow width
     let finish = now + bullet.speed + bullet.offset;
@@ -404,7 +436,7 @@ function renderTopBullet(dom, node, delay) {
         top += dom.offsetHeight;
     }
     if (!perfect) {
-        if (track.topTop >= container.clientHeight - dom.offsetHeight) {
+        if (track.topTop > container.clientHeight - dom.offsetHeight) {
             track.topTop = 0;
         }
         top = track.topTop;
@@ -413,6 +445,54 @@ function renderTopBullet(dom, node, delay) {
     dom.style.top = top + 'px';
     bullet.startTime = now + bullet.offset;
     track.top.set(top, {
+        finish: finish
+    });
+    thisAttr.bList.push(bullet);
+    bullet.shot();
+}
+
+function renderBottomBullet(obj) {
+    let dom = obj.dom,
+        node = obj.node,
+        delay = obj.delay,
+        immediately = obj.immediately;
+    let thisAttr = attr.call(this);
+    let config = this.config;
+    let container = thisAttr.container;
+    let totalOffset = immediately ? 0 : delay + node.offset;
+    let now = Date.now();
+    dom.style.left = container.clientWidth + 1 + 'px'; //1 is shadow width
+    //dom.style.willChange = "opacity";
+    container.appendChild(dom);
+    let bullet = new BiuBullet({
+        cfgObj: node,
+        dom: dom,
+        speed: config.speed,
+        offset: totalOffset,
+        style: this.style,
+    });
+    bullet.distination = (container.clientWidth + dom.offsetWidth) / 2 + 1;//1 is shadow width
+    let finish = now + bullet.speed + bullet.offset;
+    let perfect = false;
+    let top = container.clientHeight - dom.offsetHeight;
+    let track = thisAttr.track;
+    while (top >= 0) {
+        if (!track.bottom.has(top) || now + bullet.offset >= track.bottom.get(top).finish) {
+            perfect = true;
+            break;
+        }
+        top -= dom.offsetHeight;
+    }
+    if (!perfect) {
+        if (track.bottomTop < 0) {
+            track.bottomTop = container.clientHeight - dom.offsetHeight;
+        }
+        top = track.bottomTop;
+        track.bottomTop -= dom.offsetHeight;
+    }
+    dom.style.top = top + 'px';
+    bullet.startTime = now + bullet.offset;
+    track.bottom.set(top, {
         finish: finish
     });
     thisAttr.bList.push(bullet);
