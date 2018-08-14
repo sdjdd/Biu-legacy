@@ -24,7 +24,6 @@ class Biu {
         container.style.width = '100%';
         container.style.pointerEvents = 'none';
         el.appendChild(container);
-
         thisAttr.container = container;
         this.config = {
             speed: 6000,    // * millisecond to complete
@@ -42,7 +41,6 @@ class Biu {
             start: 0,
             currentSecond: 0,
         };  //play progress
-
         thisAttr.timer = null;
         thisAttr.clip = new Map;              //danmaku data
         thisAttr.track = {    //flying danmaku track
@@ -55,6 +53,22 @@ class Biu {
         }
         thisAttr.state = 0;    //0=stop, 1=play, 2=pause
 
+        //enable custom config
+        if (obj.speed) {
+            this.config.speed = obj.speed;
+        }
+        if (obj.config) {
+            let keys = Object.keys(obj.config);
+            for (let i = 0; i < keys.length; ++i) {
+                this.config[keys[i]] = obj.config[keys[i]];
+            }
+        }
+        if (obj.style) {
+            let keys = Object.keys(obj.style);
+            for (let i = 0; i < keys.length; ++i) {
+                this.style[keys[i]] = obj.style[keys[i]];
+            }
+        }
     }
 
     getAttr() {
@@ -151,12 +165,18 @@ class Biu {
         if (arr) biu.render(arr, delay);
     }
 
-    load(obj) {
-        let danmaku = createDanmakuNode(obj);
-        if (danmaku === null) { 
-            return;
+    load(arr) {
+        if (!(arr instanceof Array)) {
+            arr = [arr];
         }
-        loadDanmaku.call(this, danmaku);
+        let biu = this;
+        arr.forEach(function(v){
+            let danmaku = createDanmakuNode(v);
+            if (danmaku === null) { 
+                return;
+            }
+            loadDanmaku.call(biu, danmaku);
+        });
     }
 
     render(danmakus, delay, immediately) {
