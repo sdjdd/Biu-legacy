@@ -1,62 +1,83 @@
 import BiuBullet from './biu-bullet';
 
+var attribute = new WeakMap();
+
+function attr() {
+    if (attribute.has(this)) {
+        return attribute.get(this);
+    } else {
+        let obj = {};
+        attribute.set(this, obj);
+        return obj;
+    }
+}
+
 class Biu {
     constructor(obj) {
         //initialize container style
-        this.el = document.querySelector(obj.el);
-        this.container = document.createElement('div');
-        this.container.style.position = 'relative';
-        this.container.style.overflow = 'hidden';
-        this.container.style.height = '100%';
-        this.container.style.width = '100%';
-        this.container.style.pointerEvents = 'none';
-        this.el.appendChild(this.container);
+        let thisAttr = attr.call(this);
+        let el = document.querySelector(obj.el);
+        let container = document.createElement('div');
+        container.style.position = 'relative';
+        container.style.overflow = 'hidden';
+        container.style.height = '100%';
+        container.style.width = '100%';
+        container.style.pointerEvents = 'none';
+        el.appendChild(container);
+
+        thisAttr.container = container;
         this.config = {
+            speed: 6000,    // * millisecond to complete
+        };
+        this.style = {
             fontSize: '25px',
             opacity: 1,
-            speed: 6000,    // * millisecond to complete
             fontFamily: 'SimHei',
-        }
-        this.bList = [];    //flying danmaku node
-        this.prepareList = []; //store danmaku when biu is paused 
-        
-        
-        this.progress = {
+        };
+        thisAttr.bList = [];    //flying danmaku node
+        thisAttr.prepareList = []; //store danmaku when biu is paused 
+        thisAttr.progress = {
             value: 0,
             pause: 0,
             start: 0,
             currentSecond: 0
         };  //play progress
 
-        this.timer = null;
-        this.clip = new Map;              //danmaku data
-        this.track = {    //flying danmaku track
+        thisAttr.timer = null;
+        thisAttr.clip = new Map;              //danmaku data
+        thisAttr.track = {    //flying danmaku track
             roll: new Map,
             top: new Map,
             bottom: new Map,
             rollTop: 0,
             topTop: 0
         }
-        this.state = 0;    //0=stop, 1=play, 2=pause
+        thisAttr.state = 0;    //0=stop, 1=play, 2=pause
 
     }
 
+    getAttr() {
+        return attr.call(this);
+    }
+
     play(t) {
-        if (this.state === 1 && t === undefined) {
+        let thisAttr = attr.call(this);
+        let progress = thisAttr.progress;
+        if (thisAttr.state === 1 && t === undefined) {
             //do not change timeline when playing without current time provided
             return;
         }
-        let fromPause = this.state === 2;
-        let fromStop = this.state === 0;
-        let fromPlay = this.state === 1;
-        this.state = 1;
+        let fromPause = thisAttr.state === 2;
+        let fromStop = thisAttr.state === 0;
+        let fromPlay = thisAttr.state === 1;
+        thisAttr.state = 1;
         let now = Date.now();
         let biu = this;
-        this.progress.start = now;
+        progress.start = now;
         if (t !== undefined) {
             //change timeline
-            this.progress.value = t;
-            this.progress.currentSecond = Math.floor(t / 1000);
+            progress.value = t;
+            progress.currentSecond = Math.floor(t / 1000);
             this.clear();
             renderThisSecond.call(this);
         }
@@ -64,10 +85,10 @@ class Biu {
             return;
         } else if (fromPause) {
             if (t === undefined) {
-                biu.syncTrack(now - biu.progress.pause);
+                biu.syncTrack(now - progress.pause);
             }
             //resume every danmaku node
-            this.bList.forEach(function(v){
+            thisAttr.bList.forEach(function(v){
                 v.resume();
             });
         } else if (fromStop) {
@@ -76,57 +97,56 @@ class Biu {
             }
         }
         //===
-        
-        let progress = biu.progress;
         let currentValue = progress.value;
         let currentSecond = Math.ceil(currentValue / 1000);
         let currentOffset = 1000 - currentValue % 1000;
-        if (biu.progress.currentSecond !== currentSecond) {
-            biu.progress.currentSecond = currentSecond;
+        if (progress.currentSecond !== currentSecond) {
+            progress.currentSecond = currentSecond;
             biu.biu(currentSecond, currentOffset);
         }
         
         //===
         let f = function(){
-            let progress = biu.progress;
             let currentValue = Date.now() - progress.start + progress.value;
             let currentSecond = Math.ceil(currentValue / 1000);
             let currentOffset = 1000 - currentValue % 1000;
-            if (biu.progress.currentSecond === currentSecond) {
+            if (progress.currentSecond === currentSecond) {
                 return;
             }
-            biu.progress.currentSecond = currentSecond;
+            progress.currentSecond = currentSecond;
             biu.biu(currentSecond, currentOffset);
         };
-        f();
-        this.timer = setInterval(f, 500);
+        thisAttr.timer = setInterval(f, 500);
 
         //render and shot prepare danmaku
-        if (biu.prepareList.length > 0) {
-            biu.prepareList.forEach(function(v){
+        if (thisAttr.prepareList.length > 0) {
+            thisAttr.prepareList.forEach(function(v){
                 biu.render(v);
             });
-            biu.prepareList = [];
+            thisAttr.prepareList = [];
         }
     }
 
     biu(second, delay) {
-        let biu = this;
+        let thisAttr = attr.call(this);
+        let bList = thisAttr.bList;
+        let container = thisAttr.container;
         let now = Date.now();
+        let biu = this;
         //delete invisible danmaku node
         let i = 0;
-        for (; i < this.bList.length; ++i) {
-            if (this.bList[i].state == 1 && now >= this.bList[i].speed + this.bList[i].startTime) {
-                biu.container.removeChild(this.bList[i].dom);
+        for (; i < bList.length; ++i) {
+            if (/*bList[i].state == 1 && */now >= bList[i].speed + bList[i].startTime) {
+                container.removeChild(bList[i].dom);
             } else {
                 break;
             }
         }
-        if (i > 0) this.bList.splice(0, i);
+        if (i > 0) bList.splice(0, i);
         if (isDocumentHidden()) {
             return;   
         }
-        let arr = this.clip.get(second);
+        let arr = thisAttr.clip.get(second);
         if (arr) biu.render(arr, delay);
     }
 
@@ -162,15 +182,16 @@ class Biu {
     }
 
     shot(obj, load) {
+        let thisAttr = attr.call(this);
         obj.time = this.progress.value;
         let danmaku = createDanmakuNode(obj);
         if (danmaku === null) {
             return;
         }
-        if (this.state === 1) {
+        if (thisAttr.state === 1) {
             this.render([danmaku]);
         } else {
-            this.prepareList.push(danmaku);
+            thisAttr.prepareList.push(danmaku);
         }
         if (load) {
             loadDanmaku.call(this, danmaku);
@@ -178,36 +199,39 @@ class Biu {
     }
 
     pause() {
-        if (this.state !== 1) {
+        let thisAttr = attr.call(this);
+        if (thisAttr.state !== 1) {
             return;
         }
-        this.state = 2;
+        thisAttr.state = 2;
         let now = Date.now();
-        this.progress.pause = now;
-        this.progress.value += now - this.progress.start;
-        clearInterval(this.timer);
-        this.bList.forEach(function(v){
+        thisAttr.progress.pause = now;
+        thisAttr.progress.value += now - thisAttr.progress.start;
+        clearInterval(thisAttr.timer);
+        thisAttr.bList.forEach(function(v){
             v.pause();
         });
     }
 
     syncTrack(t) {
-        this.track.roll.forEach(function(v){
+        let track = attr.call(this).track;
+        track.roll.forEach(function(v){
             v.appear += t;
             v.finish += t;
         });
-        this.track.top.forEach(function(v){
+        track.top.forEach(function(v){
             v.finish += t;
         });
     }
 
     clear() {
-        let container = this.container;
-        let track = this.track;
-        this.bList.forEach(function(v){
+        let thisAttr = attr.call(this);
+        let container = thisAttr.container;
+        let track = thisAttr.track;
+        thisAttr.bList.forEach(function(v){
             container.removeChild(v.dom);
         });
-        this.bList.splice(0, this.bList.length);
+        thisAttr.bList.splice(0, thisAttr.bList.length);
         track.roll.clear();
         track.top.clear();
         track.bottom.clear();
@@ -228,6 +252,7 @@ function isDocumentHidden() {
 
 function createBiuDom() {
     let dom = document.createElement('div');
+    let style = this.style;
     dom.style.position = 'absolute';
     dom.style.whiteSpace = 'pre';
     dom.style.display = 'inline-block';
@@ -235,10 +260,10 @@ function createBiuDom() {
     dom.style.webkitUserSelect = 'none';
     dom.style.pointerEvents = 'none';
     dom.style.color = '#fff';
-    dom.style.fontSize = this.config.fontSize;
-    dom.style.fontFamily = this.config.fontFamily;
+    dom.style.fontSize = style.fontSize;
+    dom.style.fontFamily = style.fontFamily;
     dom.style.fontWeight = 'bold';
-    dom.style.opacity = this.config.opacity;
+    dom.style.opacity = style.opacity;
     dom.style.textShadow = '0 0 1px #000, 0 0 1px #000, 0 0 1px #000';
     return dom;
 }
@@ -265,8 +290,9 @@ function createDanmakuNode(obj) {
 }
 
 function loadDanmaku(d) {
-    if (this.clip.has(d.second)) {
-        let arr = this.clip.get(d.second);
+    let clip = attr.call(this).clip;
+    if (clip.has(d.second)) {
+        let arr = clip.get(d.second);
         //TODO:用二分查找优化
         for (let i = 0; i < arr.length; ++i) {
             if (arr[i].offset > d.offset) {
@@ -276,17 +302,18 @@ function loadDanmaku(d) {
         }
         arr.push(d);
     } else {
-        this.clip.set(d.second, [d])
+        clip.set(d.second, [d])
     }
 }
 
 function renderThisSecond() {
-    let second = Math.floor(this.progress.value / 1000);
-    let offset = this.progress.value % 1000;
-    if (!this.clip.has(second)) {
+    let thisAttr = attr.call(this);
+    let second = Math.floor(thisAttr.progress.value / 1000);
+    let offset = thisAttr.progress.value % 1000;
+    if (!thisAttr.clip.has(second)) {
         return;
     }
-    let danmakus = this.clip.get(second);
+    let danmakus = thisAttr.clip.get(second);
     let t = [];
     let i = 0;
     for (; i < danmakus.length; ++i) {
@@ -302,87 +329,93 @@ function renderThisSecond() {
 }
 
 function renderRollBullet(dom, node, delay) {
+    let thisAttr = attr.call(this);
+    let container = thisAttr.container;
+    let config = this.config;
     let totalOffset = delay + node.offset;
     let now = Date.now();
-    dom.style.left = this.container.clientWidth + 1 + 'px'; //1 is shadow width
+    dom.style.left = container.clientWidth + 1 + 'px'; //1 is shadow width
     dom.style.willChange = "transform";
-    this.container.appendChild(dom);
+    container.appendChild(dom);
     let bullet = new BiuBullet({
         cfgObj: node,
         dom: dom,
-        speed: this.config.speed,
+        speed: config.speed,
         offset: totalOffset
     });
-    bullet.distination = this.container.clientWidth + dom.offsetWidth + 2 * 1;//1 is shadow width
+    bullet.distination = container.clientWidth + dom.offsetWidth + 2 * 1;//1 is shadow width
     let pxSpeed = bullet.distination / bullet.speed;
     let finish = now + bullet.speed + totalOffset;
     let touchLeft = (bullet.distination - dom.offsetWidth - 1) / pxSpeed + now + totalOffset;//1 is shadow width
     let appear = dom.offsetWidth / pxSpeed + now + totalOffset;
     let perfect = false;
     let top = 0;
-    let track = this.track.roll;
-    while (top <= this.container.clientHeight - dom.offsetHeight) {
-        if (!track.has(top) || (now + totalOffset >= track.get(top).appear && track.get(top).finish <= touchLeft)) {
+    let track = thisAttr.track;
+    while (top <= container.clientHeight - dom.offsetHeight) {
+        if (!track.roll.has(top) || (now + totalOffset >= track.roll.get(top).appear && track.roll.get(top).finish <= touchLeft)) {
             perfect = true;
             break;
         }
         top += dom.offsetHeight;
     }
     if (!perfect) {
-        if (this.track.rollTop >= this.container.clientHeight - dom.offsetHeight) {
-            this.track.rollTop = 0;
+        if (track.rollTop >= container.clientHeight - dom.offsetHeight) {
+            track.rollTop = 0;
         }
-        top = this.track.rollTop;
-        this.track.rollTop += dom.offsetHeight;
+        top = track.rollTop;
+        track.rollTop += dom.offsetHeight;
     }
 
     dom.style.top = top + 'px';
     bullet.startTime = now + totalOffset;
-    track.set(top, {
+    track.roll.set(top, {
         appear: appear,
         finish: finish
     });
-    this.bList.push(bullet);
+    thisAttr.bList.push(bullet);
     bullet.shot();
 }
 
 function renderTopBullet(dom, node, delay) {
+    let thisAttr = attr.call(this);
+    let config = this.config;
+    let container = thisAttr.container;
     let totalOffset = delay + node.offset;
     let now = Date.now();
-    dom.style.left = this.container.clientWidth + 1 + 'px'; //1 is shadow width
+    dom.style.left = container.clientWidth + 1 + 'px'; //1 is shadow width
     //dom.style.willChange = "opacity";
-    this.container.appendChild(dom);
+    container.appendChild(dom);
     let bullet = new BiuBullet({
         cfgObj: node,
         dom: dom,
-        speed: this.config.speed,
+        speed: config.speed,
         offset: totalOffset
     });
-    bullet.distination = (this.container.clientWidth + dom.offsetWidth) / 2 + 1;//1 is shadow width
+    bullet.distination = (container.clientWidth + dom.offsetWidth) / 2 + 1;//1 is shadow width
     let finish = now + bullet.speed + bullet.offset;
     let perfect = false;
     let top = 0;
-    let track = this.track.top;
-    while (top <= this.container.clientHeight - dom.offsetHeight) {
-        if (!track.has(top) || now + bullet.offset >= track.get(top).finish) {
+    let track = thisAttr.track;
+    while (top <= container.clientHeight - dom.offsetHeight) {
+        if (!track.top.has(top) || now + bullet.offset >= track.top.get(top).finish) {
             perfect = true;
             break;
         }
         top += dom.offsetHeight;
     }
     if (!perfect) {
-        if (this.track.topTop >= this.container.clientHeight - dom.offsetHeight) {
-            this.track.topTop = 0;
+        if (track.topTop >= container.clientHeight - dom.offsetHeight) {
+            track.topTop = 0;
         }
-        top = this.track.topTop;
-        this.track.topTop += dom.offsetHeight;
+        top = track.topTop;
+        track.topTop += dom.offsetHeight;
     }
     dom.style.top = top + 'px';
     bullet.startTime = now + bullet.offset;
-    track.set(top, {
+    track.top.set(top, {
         finish: finish
     });
-    this.bList.push(bullet);
+    thisAttr.bList.push(bullet);
     bullet.shot();
 }
 
