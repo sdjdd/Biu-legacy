@@ -4,11 +4,10 @@ var biu = new Biu({
     speed: 7000,
     style: {
         opacity: 1,
-        fontSize: '25px'
+        fontSize: '25px',
+        fontWeight: 'bold',
     }
-});
-
-biu.load(danmakuData);
+}).load(danmakuData);
 
 var seeked = false;
 var currentTime = 0;
@@ -39,4 +38,9 @@ video.onplay = function(){
 
 video.onpause = function(){
     biu.pause();
+}
+
+video.onended = () => {
+    currentTime = 0;
+    seeked = true;
 }
