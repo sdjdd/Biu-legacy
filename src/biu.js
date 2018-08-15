@@ -1,4 +1,5 @@
-import BiuBullet from './biu-bullet';
+import BiuBullet from './Biu-bullet';
+import BiuTrack from './Biu-track';
 
 var attribute = new WeakMap();
 
@@ -14,61 +15,56 @@ function attr() {
 
 class Biu {
     constructor(obj) {
-        //initialize container style
         let thisAttr = attr.call(this);
-        let el = document.querySelector(obj.el);
-        let container = document.createElement('div');
-        container.style.position = 'relative';
-        container.style.overflow = 'hidden';
-        container.style.height = '100%';
-        container.style.width = '100%';
-        container.style.pointerEvents = 'none';
-        el.appendChild(container);
-        thisAttr.container = container;
+        let el;
+        if (obj.el instanceof HTMLElement) {
+            el = obj.el;
+        } else if (typeof obj.el === 'string') {
+            el = document.querySelector(obj.el);
+        }
+        thisAttr.container = createDanmakuContainer();
+        el.appendChild(thisAttr.container);
         this.config = {
-            speed: 6000,    // * millisecond to complete
+            speed: obj.speed || 6000,  // * millisecond to complete
         };
-        this.style = {
-            fontSize: '25px',
-            opacity: 1,
+        this.style = {  //default global style
+            color: '#FFF',
             fontFamily: 'SimHei',
+            fontSize: '25px',
+            fontWeight: 'normal',
+            opacity: 1,
         };
-        thisAttr.bList = [];    //flying danmaku node
-        thisAttr.prepareList = []; //store danmaku when biu is paused 
-        thisAttr.progress = {
+        thisAttr.bList = [];        //flying danmaku node
+        thisAttr.prepareList = [];  //store danmaku when biu is paused 
+        thisAttr.progress = {       //play progress
             value: 0,
             pause: 0,
             start: 0,
             currentSecond: 0,
-        };  //play progress
+        };
         thisAttr.timer = null;
-        thisAttr.clip = new Map;              //danmaku data
-        thisAttr.track = {    //flying danmaku track
-            roll: new Map,
-            top: new Map,
-            bottom: new Map,
-            rollTop: 0,
-            topTop: 0,
-            bottomTop: -1,
+        thisAttr.clip = new Map;  //danmaku data
+        thisAttr.track = {        //flying danmaku track
+            roll: new BiuTrack(),
+            top: new BiuTrack(),
+            bottom: new BiuTrack(),
         }
-        thisAttr.state = 0;    //0=stop, 1=play, 2=pause
-
-        //enable custom config
-        if (obj.speed) {
-            this.config.speed = obj.speed;
-        }
+        thisAttr.state = 0;  //0=stop, 1=play, 2=pause
         if (obj.config) {
+            //set custom config
             let keys = Object.keys(obj.config);
             for (let i = 0; i < keys.length; ++i) {
                 this.config[keys[i]] = obj.config[keys[i]];
             }
         }
         if (obj.style) {
+            //set custom style
             let keys = Object.keys(obj.style);
             for (let i = 0; i < keys.length; ++i) {
                 this.style[keys[i]] = obj.style[keys[i]];
             }
         }
+        return this;
     }
 
     getAttr() {
@@ -100,7 +96,10 @@ class Biu {
             return;
         } else if (fromPause) {
             if (t === undefined) {
-                biu.syncTrack(now - progress.pause);
+                let t = now - progress.pause;
+                thisAttr.track.roll.sync(t);
+                thisAttr.track.top.sync(t);
+                thisAttr.track.bottom.sync(t);
             }
             //resume every danmaku node
             thisAttr.bList.forEach(function(v){
@@ -119,7 +118,6 @@ class Biu {
             progress.currentSecond = currentSecond;
             biu.biu(currentSecond, currentOffset);
         }
-        
         //===
         let f = function(){
             let currentValue = Date.now() - progress.start + progress.value;
@@ -135,10 +133,8 @@ class Biu {
 
         //render and shot prepare danmaku
         if (thisAttr.prepareList.length > 0) {
-            thisAttr.prepareList.forEach(function(v){
-                biu.render(v);
-            });
-            thisAttr.prepareList = [];
+            biu.render(thisAttr.prepareList, 0, true);
+            thisAttr.prepareList.splice(0, thisAttr.prepareList.length);
         }
     }
 
@@ -159,7 +155,7 @@ class Biu {
         }
         if (i > 0) bList.splice(0, i);
         if (isDocumentHidden()) {
-            return;   
+            return;
         }
         let arr = thisAttr.clip.get(second);
         if (arr) biu.render(arr, delay);
@@ -171,12 +167,13 @@ class Biu {
         }
         let biu = this;
         arr.forEach(function(v){
-            let danmaku = createDanmakuNode(v);
+            let danmaku = createDanmakuNode.call(biu, v);
             if (danmaku === null) { 
                 return;
             }
             loadDanmaku.call(biu, danmaku);
         });
+        return this;
     }
 
     render(danmakus, delay, immediately) {
@@ -186,16 +183,12 @@ class Biu {
         if (immediately === undefined) {
             immediately = false;
         }
+        let rollArr = [],
+            topArr = [],
+            bottomArr = [];
         for (let i = 0; i < danmakus.length; ++i) {
             let node = danmakus[i];
-            let dom = createBiuDom.call(this);
-            dom.innerText = node.text;
-            if (node.color) dom.style.color = node.color; //=node.style.color
-            if (typeof node.style === 'object') {
-                Object.keys(node.style).forEach(function(v){
-                    dom.style[v] = node.style[v];
-                });
-            }
+            let dom = createBiuDom.call(this, node);
             let obj = {
                 dom: dom,
                 node: node,
@@ -204,14 +197,23 @@ class Biu {
             };
             switch (node.type) {
                 case 1:
-                    renderTopBullet.call(this, obj);
+                    topArr.push(obj);
                     break;
                 case 2:
-                    renderBottomBullet.call(this, obj);
+                    bottomArr.push(obj);
                     break;
                 default:
-                    renderRollBullet.call(this, obj);
-            }      
+                    rollArr.push(obj);
+            }
+        }
+        if (rollArr.length > 0) {
+            renderRollBullet.call(this, rollArr);
+        }
+        if (topArr.length > 0) {
+            renderTopBullet.call(this, topArr);
+        }
+        if (bottomArr.length > 0) {
+            renderBottomBullet.call(this, bottomArr);
         }
     }
 
@@ -224,8 +226,7 @@ class Biu {
         } else {
             return;
         }
-        let danmaku = createDanmakuNode(obj);
-        console.log(danmaku)
+        let danmaku = createDanmakuNode.call(this, obj);
         if (danmaku === null) {
             return;
         }
@@ -245,23 +246,14 @@ class Biu {
             return;
         }
         thisAttr.state = 2;
+        clearInterval(thisAttr.timer);
         let now = Date.now();
         thisAttr.progress.pause = now;
         thisAttr.progress.value += now - thisAttr.progress.start;
-        clearInterval(thisAttr.timer);
         thisAttr.bList.forEach(function(v){
-            v.pause();
-        });
-    }
-
-    syncTrack(t) {
-        let track = attr.call(this).track;
-        track.roll.forEach(function(v){
-            v.appear += t;
-            v.finish += t;
-        });
-        track.top.forEach(function(v){
-            v.finish += t;
+            if (now < v.speed + v.startTime) {
+                v.pause();
+            }
         });
     }
 
@@ -276,10 +268,18 @@ class Biu {
         track.roll.clear();
         track.top.clear();
         track.bottom.clear();
-        track.topTop = 0;
-        track.rollTop = 0;
-        track.bottomTop = -1;
     }
+}
+
+function createDanmakuContainer() {
+    let container = document.createElement('div');
+    //initialize container style
+    container.style.position = 'relative';
+    container.style.overflow = 'hidden';
+    container.style.height = '100%';
+    container.style.width = '100%';
+    container.style.pointerEvents = 'none';
+    return container;
 }
 
 function isDocumentHidden() {
@@ -292,42 +292,50 @@ function isDocumentHidden() {
     }
 }
 
-function createBiuDom() {
+function createBiuDom(obj) {
     let dom = document.createElement('div');
-    let style = this.style;
+    dom.innerText = obj.text;
+    let globalStyle = this.style;
+    //set global style
+    Object.keys(globalStyle).forEach(k => {
+        dom.style[k] = globalStyle[k];
+    });
+    //set node style
+    Object.keys(obj.style).forEach(k => {
+        dom.style[k] = obj.style[k];
+    });
+    //set Biu style
     dom.style.position = 'absolute';
     dom.style.whiteSpace = 'pre';
     dom.style.display = 'inline-block';
     dom.style.userSelect = 'none';
     dom.style.webkitUserSelect = 'none';
     dom.style.pointerEvents = 'none';
-    dom.style.color = '#fff';
-    dom.style.fontSize = style.fontSize;
-    dom.style.fontFamily = style.fontFamily;
-    dom.style.fontWeight = 'bold';
-    dom.style.opacity = style.opacity;
     dom.style.textShadow = '0 0 1px #000, 0 0 1px #000, 0 0 1px #000';
     return dom;
 }
 
 function createDanmakuNode(obj) {
-    if (obj.time === undefined || obj.text === undefined) return null;
+    if (obj.time === undefined || obj.text === undefined) {
+        return null;
+    }
+    if (!obj.style) {
+        obj.style = {};
+        if (obj.color) {
+            obj.style.color = obj.color;
+        }
+    } else if (!obj.style.color) {
+        obj.style.color = obj.color;
+    }
+    let second = Math.floor(obj.time / 1000),
+        offset = obj.time % 1000;
     let danmaku = {
-        second: 0,
-        offset: 0,
-        type: 0,
+        second: second,
+        offset: offset,
+        type: obj.type || 0,
         text: obj.text,
-        color: '#fff'
+        style: obj.style,
     };
-    let s = Math.floor(obj.time / 1000);
-    danmaku.second = s;
-    danmaku.offset = obj.time % 1000;
-    if (obj.color) {
-        danmaku.color = obj.color;
-    }
-    if (obj.type) {
-        danmaku.type = obj.type;
-    }
     return danmaku;
 }
 
@@ -366,157 +374,112 @@ function renderThisSecond() {
     if (i >= danmakus.length) {
         return;
     }
-    t = danmakus.slice(i)
+    t = danmakus.slice(i);
     this.render(t, -offset);
 }
 
-function renderRollBullet(obj) {
-    let dom = obj.dom,
-        node = obj.node,
-        delay = obj.delay,
-        immediately = obj.immediately;
+function renderRollBullet(arr) {
+    let globalConfig = this.config;
     let thisAttr = attr.call(this);
-    let container = thisAttr.container;
-    let config = this.config;
-    let totalOffset = immediately ? 0 : delay + node.offset;
+    let container = thisAttr.container,
+        cch = container.clientHeight,
+        ccw = container.clientWidth;
     let now = Date.now();
-    dom.style.left = container.clientWidth + 1 + 'px'; //1 is shadow width
-    dom.style.willChange = "transform";
-    container.appendChild(dom);
-    let bullet = new BiuBullet({
-        cfgObj: node,
-        dom: dom,
-        speed: config.speed,
-        offset: totalOffset,
-        style: this.style,
+    arr.forEach(arrNode => {
+        let dom = arrNode.dom,
+            danmakuObj = arrNode.node,
+            delay = arrNode.delay,
+            immediately = arrNode.immediately,
+            totalOffset = immediately ? 0 : delay + danmakuObj.offset;
+        dom.style.left = ccw + 2 + 'px'; //2 is shadow width
+        dom.style.willChange = "transform";
+        container.appendChild(dom);
+        let bullet = new BiuBullet({
+            cfgObj: danmakuObj,
+            dom: dom,
+            speed: globalConfig.speed,
+            offset: totalOffset,
+            distination: ccw + dom.offsetWidth + 2 + 2,  //2 is shadow width
+            startTime: now + totalOffset,
+        });
+        thisAttr.bList.push(bullet);
+        let pxSpeed = bullet.distination / bullet.speed;
+        let finish = now + bullet.speed + totalOffset;
+        let touchLeft = (bullet.distination - dom.offsetWidth - 2) / pxSpeed + now + totalOffset;  //2 is shadow width
+        let appear = dom.offsetWidth / pxSpeed + now + totalOffset;
+        let track = thisAttr.track.roll;
+        let top = track.roll(now + totalOffset, cch, appear, touchLeft, finish, dom.offsetHeight);
+        dom.style.top = top + 'px';
+        bullet.shot();
     });
-    bullet.distination = container.clientWidth + dom.offsetWidth + 2 * 1;//1 is shadow width
-    let pxSpeed = bullet.distination / bullet.speed;
-    let finish = now + bullet.speed + totalOffset;
-    let touchLeft = (bullet.distination - dom.offsetWidth - 1) / pxSpeed + now + totalOffset;//1 is shadow width
-    let appear = dom.offsetWidth / pxSpeed + now + totalOffset;
-    let perfect = false;
-    let top = 0;
-    let track = thisAttr.track;
-    while (top <= container.clientHeight - dom.offsetHeight) {
-        if (!track.roll.has(top) || (now + totalOffset >= track.roll.get(top).appear && track.roll.get(top).finish <= touchLeft)) {
-            perfect = true;
-            break;
-        }
-        top += dom.offsetHeight;
-    }
-    if (!perfect) {
-        if (track.rollTop > container.clientHeight - dom.offsetHeight) {
-            track.rollTop = 0;
-        }
-        top = track.rollTop;
-        track.rollTop += dom.offsetHeight;
-    }
-
-    dom.style.top = top + 'px';
-    bullet.startTime = now + totalOffset;
-    track.roll.set(top, {
-        appear: appear,
-        finish: finish
-    });
-    thisAttr.bList.push(bullet);
-    bullet.shot();
 }
 
-function renderTopBullet(obj) {
-    let dom = obj.dom,
-        node = obj.node,
-        delay = obj.delay,
-        immediately = obj.immediately;
+function renderTopBullet(arr) {
+    let globalConfig = this.config;
     let thisAttr = attr.call(this);
-    let config = this.config;
-    let container = thisAttr.container;
-    let totalOffset = immediately ? 0 : delay + node.offset;
+    let container = thisAttr.container,
+        cch = container.clientHeight,
+        ccw = container.clientWidth;
     let now = Date.now();
-    dom.style.left = container.clientWidth + 1 + 'px'; //1 is shadow width
-    //dom.style.willChange = "opacity";
-    container.appendChild(dom);
-    let bullet = new BiuBullet({
-        cfgObj: node,
-        dom: dom,
-        speed: config.speed,
-        offset: totalOffset,
-        style: this.style,
+    arr.forEach(arrNode => {
+        let dom = arrNode.dom,
+            danmakuObj = arrNode.node,
+            delay = arrNode.delay,
+            immediately = arrNode.immediately,
+            totalOffset = immediately ? 0 : delay + danmakuObj.offset;
+        dom.style.left = ccw + 2 + 'px'; //2 is shadow width
+        dom.style.willChange = "transform";
+        container.appendChild(dom);
+        let bullet = new BiuBullet({
+            cfgObj: danmakuObj,
+            dom: dom,
+            speed: globalConfig.speed,
+            offset: totalOffset,
+            distination: (ccw + dom.offsetWidth) / 2 + 2,  //2 is shadow width
+            startTime: now + totalOffset,
+        });
+        let finish = now + bullet.speed + bullet.offset;
+        let track = thisAttr.track.top;
+        let top = track.top(now + totalOffset, cch, finish, dom.offsetHeight);
+        dom.style.top = top + 'px';
+        bullet.top = top;
+        thisAttr.bList.push(bullet);
+        bullet.shot();
     });
-    bullet.distination = (container.clientWidth + dom.offsetWidth) / 2 + 1;//1 is shadow width
-    let finish = now + bullet.speed + bullet.offset;
-    let perfect = false;
-    let top = 0;
-    let track = thisAttr.track;
-    while (top <= container.clientHeight - dom.offsetHeight) {
-        if (!track.top.has(top) || now + bullet.offset >= track.top.get(top).finish) {
-            perfect = true;
-            break;
-        }
-        top += dom.offsetHeight;
-    }
-    if (!perfect) {
-        if (track.topTop > container.clientHeight - dom.offsetHeight) {
-            track.topTop = 0;
-        }
-        top = track.topTop;
-        track.topTop += dom.offsetHeight;
-    }
-    dom.style.top = top + 'px';
-    bullet.startTime = now + bullet.offset;
-    track.top.set(top, {
-        finish: finish
-    });
-    thisAttr.bList.push(bullet);
-    bullet.shot();
 }
 
-function renderBottomBullet(obj) {
-    let dom = obj.dom,
-        node = obj.node,
-        delay = obj.delay,
-        immediately = obj.immediately;
+function renderBottomBullet(arr) {
+    let globalConfig = this.config;
     let thisAttr = attr.call(this);
-    let config = this.config;
-    let container = thisAttr.container;
-    let totalOffset = immediately ? 0 : delay + node.offset;
+    let container = thisAttr.container,
+        cch = container.clientHeight,
+        ccw = container.clientWidth;
     let now = Date.now();
-    dom.style.left = container.clientWidth + 1 + 'px'; //1 is shadow width
-    //dom.style.willChange = "opacity";
-    container.appendChild(dom);
-    let bullet = new BiuBullet({
-        cfgObj: node,
-        dom: dom,
-        speed: config.speed,
-        offset: totalOffset,
-        style: this.style,
+    arr.forEach(arrNode => {
+        let dom = arrNode.dom,
+            danmakuObj = arrNode.node,
+            delay = arrNode.delay,
+            immediately = arrNode.immediately,
+            totalOffset = immediately ? 0 : delay + danmakuObj.offset;
+        dom.style.left = ccw + 2 + 'px'; //2 is shadow width
+        dom.style.willChange = "transform";
+        container.appendChild(dom);
+        let bullet = new BiuBullet({
+            cfgObj: danmakuObj,
+            dom: dom,
+            speed: globalConfig.speed,
+            offset: totalOffset,
+            distination: (ccw + dom.offsetWidth) / 2 + 2,  //2 is shadow width
+            startTime: now + totalOffset,
+        });
+        let finish = now + bullet.speed + bullet.offset;
+        let track = thisAttr.track.bottom;
+        let top = track.bottom(now + totalOffset, cch, finish, dom.offsetHeight);
+        dom.style.top = top + 'px';
+        bullet.top = top;
+        thisAttr.bList.push(bullet);
+        bullet.shot();
     });
-    bullet.distination = (container.clientWidth + dom.offsetWidth) / 2 + 1;//1 is shadow width
-    let finish = now + bullet.speed + bullet.offset;
-    let perfect = false;
-    let top = container.clientHeight - dom.offsetHeight;
-    let track = thisAttr.track;
-    while (top >= 0) {
-        if (!track.bottom.has(top) || now + bullet.offset >= track.bottom.get(top).finish) {
-            perfect = true;
-            break;
-        }
-        top -= dom.offsetHeight;
-    }
-    if (!perfect) {
-        if (track.bottomTop < 0) {
-            track.bottomTop = container.clientHeight - dom.offsetHeight;
-        }
-        top = track.bottomTop;
-        track.bottomTop -= dom.offsetHeight;
-    }
-    dom.style.top = top + 'px';
-    bullet.startTime = now + bullet.offset;
-    track.bottom.set(top, {
-        finish: finish
-    });
-    thisAttr.bList.push(bullet);
-    bullet.shot();
 }
 
 export default Biu;

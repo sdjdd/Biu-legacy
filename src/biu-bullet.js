@@ -9,90 +9,69 @@ class BiuBullet {
         this.distination = 0;
         this.passed = 0;
         this.offset = 0;
-        this.style = null;
-
+        this.top = 0;  //only top&bottom need
         let bullet = this;
-        Object.keys(obj).forEach(function(v){
-            bullet[v] = obj[v]
+        Object.keys(obj).forEach(k => {
+            bullet[k] = obj[k];
         });
     }
 
     shot() {
-        if (this.state != 0) return;
+        if (this.state != 0) {
+            return;
+        }
         this.state = 1;
         if (this.cfgObj.type === 0) {
-            this.setTransition('transform', this.speed + 'ms', 'linear', this.offset + 'ms');
+            this.dom.style.transition = 'transform ' + this.speed + 'ms linear ' + this.offset + 'ms';
         } else if (this.cfgObj.type === 1 || this.cfgObj.type === 2) {
-            //this.setTransition('transform', '0s', 'linear', this.cfgObj.offset + 'ms');
-            this.dom.style.transition = 'transform 0s linear ' + this.offset + 'ms, opacity 0s linear ' + (this.speed + this.offset) + 'ms';
-            this.dom.style.opacity = 0;
+            this.dom.style.transition = 'transform 0s linear ' + this.offset + 'ms, top 0s linear ' + (this.speed + this.offset) + 'ms';
+            this.dom.style.top = '-' + (this.dom.offsetHeight + 2) + 'px';  //2 is shadow width
         }
         this.dom.style.transform = 'translateX(-' + this.distination + 'px)';
     }
 
     pause() {
-        if (this.state != 1) return;
+        if (this.state != 1) {
+            return;
+        }
         this.state = 2;
         let passedTime = Date.now() - this.startTime;
         let passed = 0;
         if (passedTime < 0) {
             this.offset = -passedTime;
         } else {
-            this.offset = 0;
+            this.offset = 0;  //clear offset
             if (this.cfgObj.type === 0) {
                 passed = passedTime / this.speed * (this.distination - this.passed);
             }
             this.speed -= passedTime;
         }
-        
         if (this.cfgObj.type === 0) {
             this.passed += passed;
-            this.setTransition('transform', '0s', 'linear', '0s');
+            this.dom.style.transition = 'transform 0s linear 0s';
             this.dom.style.transform = 'translateX(-' + this.passed + 'px)';
         } else if (this.cfgObj.type === 1 || this.cfgObj.type === 2) {
             if (passedTime < 0) {
                 this.dom.style.transform = '';
             }
             this.dom.style.transition = '';
-            this.dom.style.opacity = this.style.opacity;
+            this.dom.style.top = this.top + 'px';
         }
     }
 
     resume() {
-        if (this.state != 2) return;
+        if (this.state != 2) {
+            return;
+        }
         this.state = 1;
         this.startTime = Date.now() + this.offset;
         if (this.cfgObj.type === 0) {
-            this.setTransition('transform', this.speed + 'ms', 'linear', this.offset + 'ms');
+            this.dom.style.transition = 'transform ' + this.speed + 'ms linear ' + this.offset + 'ms';
         } else if (this.cfgObj.type === 1 || this.cfgObj.type === 2) {
-            this.dom.style.transition = 'transform 0s linear ' + this.offset + 'ms, opacity 0s linear ' + (this.speed + this.offset) + 'ms';
-            this.dom.style.opacity = 0;
+            this.dom.style.transition = 'transform 0s linear ' + this.offset + 'ms, top 0s linear ' + (this.speed + this.offset) + 'ms';
+            this.dom.style.top = '-' + (this.dom.offsetHeight + 2) + 'px';  //2 is shadow width
         }
         this.dom.style.transform = 'translateX(-' + this.distination + 'px)';
-    }
-
-    setTransition(prop, dur, t, delay) {
-        this.dom.style.transition = [prop, dur, t, delay].join(' ')
-    }
-
-    setTextShadow() {
-        /*
-        let color = '#000';
-        if (this.cfgObj.color) {
-            color = this.getShadowColor(this.cfgObj.color);
-            if (!color) return;
-        } else {
-            color = '#000';
-        }
-        
-        this.dom.style.textShadow = [
-            '-' + width + 'px 0 1px ' + color,
-            width + 'px 0 1px ' + color,
-            '0 -' + width + 'px 1px ' + color,
-            '0 ' + width + 'px 1px ' + color,
-        ].join(',');
-        */
-        this.dom.style.textShadow = '0 0 1px #000, 0 0 1px #000, 0 0 1px #000';
     }
 }
 
