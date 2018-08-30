@@ -39,7 +39,7 @@ biu.play();
 `{string} color` 默认颜色，默认#FFF。  
 `{string} fontFamily` 字体，默认SimHei。  
 `{string} fontSize` 字号，默认25px。  
-`{string} fontWeight` 字体粗细，默认normal。
+`{string} fontWeight` 字体粗细，默认normal。  
 `{number} opacity` 透明度，默认1。  
 用户可提供其他有效的参数修改弹幕的样式，但并非所有样式都会被应用，由Biu统一管理的样式将会再次覆盖用户的设置。
 
